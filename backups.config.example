@@ -1,0 +1,4 @@
+volumes='photos,videos,files'
+backupdir='/backups'
+nasdir='/nas'
+b2bucketname=''
