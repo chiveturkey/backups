@@ -1,4 +1,4 @@
 volumes='photos,videos,files'
 backupdir='/backups'
 nasdir='/nas'
-b2bucketname=''
+b2bucketname='mybucket'
