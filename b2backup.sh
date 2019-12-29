@@ -91,7 +91,9 @@ echo "Upload current month (${thismonth}) to b2:"
 echo "======================================"
 echo
 
-# b2_add_thismonth
+for volume in ${volumes[*]}; do
+  b2_add_thismonth
+done
 
 # TODO.  Add logic to verify that upload succeeded before continuing on to delete old backups.
 
