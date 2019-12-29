@@ -102,7 +102,9 @@ echo "Delete old month (${oldmonth}) from b2:"
 echo "===================================="
 echo
 
-# b2_delete_oldmonth
+for volume in ${volumes[*]}; do
+  b2_delete_oldmonth
+done
 
 echo
 echo "Delete old month (${oldmonth}) locally:"
