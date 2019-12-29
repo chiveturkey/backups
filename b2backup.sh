@@ -111,7 +111,9 @@ echo "Delete old month (${oldmonth}) locally:"
 echo "===================================="
 echo
 
-# rm -fv $backupdir/$oldmonth-$volume.tar.*
+for volume in ${volumes[*]}; do
+  rm -fv $backupdir/$oldmonth-$volume.tar.*
+done
 
 echo
 echo "Backup complete."
