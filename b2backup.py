@@ -17,6 +17,7 @@ VOLUMES = 'testdir1,testdir2'
 THISMONTH = '{:%Y%m}01'.format(date.today())
 # TODO: This needs to be read in at run time.  Making it a constant for now.
 SECRET_KEY = b'abcdefghijklmnopqrstuvwxyz012345'
+BACKUP_DIRECTORY = '.'
 DEBUG = False
 
 # Methods
@@ -31,15 +32,18 @@ def format_log(message):
     print()
 
 # TODO: Retool this to ensure it works in the correct directories.
-def create_archives(volumes=VOLUMES, thismonth=THISMONTH):
+def create_archives(volumes=VOLUMES, backup_directory=BACKUP_DIRECTORY, thismonth=THISMONTH):
     '''Function creating local archives using tar and gzip.'''
     format_log('Archiving volumes.')
     for volume in volumes.split(','):
-        with tarfile.open(f'{thismonth}-{volume}.tar.gz','w:gz') as tar:
+        with tarfile.open(f'{backup_directory}/{thismonth}-{volume}.tar.gz','w:gz') as tar:
             tar.add(volume)
 
-def list_files_matching(match_pattern):
-    for filename in os.listdir():
+def list_files_matching(match_pattern, backup_directory=BACKUP_DIRECTORY):
+    # TODO: Consider adding error checking on presence of legit 'backup_directory', and/or add
+    # reasonable default that is set if config file value doesn't exist.  Or fail if config value
+    # doesn't exist...?
+    for filename in os.listdir(backup_directory):
         if re.search(match_pattern, filename):
             print(filename)
     print()
@@ -49,11 +53,11 @@ def list_local_archives():
     format_log('List local archived volumes.')
     list_files_matching(r'.*\.tar\.gz')
 
-def encrypt_archives(volumes=VOLUMES, thismonth=THISMONTH, key=SECRET_KEY):
+def encrypt_archives(volumes=VOLUMES, backup_directory=BACKUP_DIRECTORY, thismonth=THISMONTH, key=SECRET_KEY):
     '''Encrypt archives with PyNaCl.'''
     format_log('Encrypting volumes.')
     for volume in volumes.split(','):
-        with open(f'{thismonth}-{volume}.tar.gz', 'rb') as volume_file:
+        with open(f'{backup_directory}/{thismonth}-{volume}.tar.gz', 'rb') as volume_file:
             # TODO: This is a naive first pass.  It reads the *entire* contents of the file at
             # once.  If the file is large, it will fill up available RAM very quickly.
             volume_contents = volume_file.read()
@@ -61,7 +65,7 @@ def encrypt_archives(volumes=VOLUMES, thismonth=THISMONTH, key=SECRET_KEY):
             box = nacl.secret.SecretBox(key)
             encrypted_volume_contents = box.encrypt(volume_contents)
             # print(encrypted_volume_contents)
-            with open(f'{thismonth}-{volume}.tar.gz.enc', 'wb') as encrypted_volume_file:
+            with open(f'{backup_directory}/{thismonth}-{volume}.tar.gz.enc', 'wb') as encrypted_volume_file:
                 encrypted_volume_file.write(encrypted_volume_contents)
 
 def list_local_encrypted_archives():
@@ -69,17 +73,17 @@ def list_local_encrypted_archives():
     format_log('List local encrypted volumes.')
     list_files_matching(r'.*\.tar\.gz\.enc')
 
-def decrypt_archives(volumes=VOLUMES, thismonth=THISMONTH, key=SECRET_KEY):
+def decrypt_archives(volumes=VOLUMES, backup_directory=BACKUP_DIRECTORY, thismonth=THISMONTH, key=SECRET_KEY):
     '''Decrypt archives with PyNaCl.'''
     format_log('Decrypting volumes.')
     for volume in volumes.split(','):
-        with open(f'{thismonth}-{volume}.tar.gz.enc', 'rb') as encrypted_volume_file:
+        with open(f'{backup_directory}/{thismonth}-{volume}.tar.gz.enc', 'rb') as encrypted_volume_file:
             # TODO: This is a naive first pass.  It reads the *entire* contents of the file at
             # once.  If the file is large, it will fill up available RAM very quickly.
             encrypted_volume_contents = encrypted_volume_file.read()
             box = nacl.secret.SecretBox(key)
             volume_contents = box.decrypt(encrypted_volume_contents)
-            with open(f'{thismonth}-{volume}.tar.gz', 'wb') as volume_file:
+            with open(f'{backup_directory}/{thismonth}-{volume}.tar.gz', 'wb') as volume_file:
                 volume_file.write(volume_contents)
 
 # def split_file():
@@ -96,7 +100,7 @@ def main():
     encrypt_archives()
     list_local_encrypted_archives()
 
-# main()
+main()
 # encrypt_archives()
 # decrypt_archives()
 
