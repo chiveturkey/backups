@@ -35,6 +35,7 @@ def format_log(message):
 def create_archives(volumes=VOLUMES, backup_directory=BACKUP_DIRECTORY, thismonth=THISMONTH):
     '''Function creating local archives using tar and gzip.'''
     format_log('Archiving volumes.')
+    os.chdir(backup_directory)
     for volume in volumes.split(','):
         with tarfile.open(f'{backup_directory}/{thismonth}-{volume}.tar.gz','w:gz') as tar:
             tar.add(volume)
