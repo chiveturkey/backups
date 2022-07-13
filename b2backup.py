@@ -31,14 +31,18 @@ def format_log(message):
     print('=' * len(message))
     print()
 
-# TODO: Retool this to ensure it works in the correct directories.
 def create_archives(volumes=VOLUMES, backup_directory=BACKUP_DIRECTORY, thismonth=THISMONTH):
     '''Function creating local archives using tar and gzip.'''
     format_log('Archiving volumes.')
+
+    current_directory = os.getcwd()
     os.chdir(backup_directory)
+
     for volume in volumes.split(','):
         with tarfile.open(f'{backup_directory}/{thismonth}-{volume}.tar.gz','w:gz') as tar:
             tar.add(volume)
+
+    os.chdir(current_directory)
 
 def list_files_matching(match_pattern, backup_directory=BACKUP_DIRECTORY):
     # TODO: Consider adding error checking on presence of legit 'backup_directory', and/or add
