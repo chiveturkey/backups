@@ -45,6 +45,7 @@ def create_archives(volumes=VOLUMES, backup_directory=BACKUP_DIRECTORY, thismont
     os.chdir(current_directory)
 
 def list_files_matching(match_pattern, backup_directory=BACKUP_DIRECTORY):
+    '''Function listing files that match a given Regular Expression'''
     # TODO: Consider adding error checking on presence of legit 'backup_directory', and/or add
     # reasonable default that is set if config file value doesn't exist.  Or fail if config value
     # doesn't exist...?
@@ -56,9 +57,12 @@ def list_files_matching(match_pattern, backup_directory=BACKUP_DIRECTORY):
 def list_local_archives(volumes=VOLUMES):
     '''Function listing local tar'd and gzip'd archives.'''
     format_log('List local archived volumes.')
-    list_files_matching(f"\d+-({volumes.replace(',', '|')})\.tar\.gz")
+    list_files_matching(rf"\d+-({volumes.replace(',', '|')})\.tar\.gz")
 
-def encrypt_archives(volumes=VOLUMES, backup_directory=BACKUP_DIRECTORY, thismonth=THISMONTH, key=SECRET_KEY):
+def encrypt_archives(volumes=VOLUMES,
+                     backup_directory=BACKUP_DIRECTORY,
+                     thismonth=THISMONTH,
+                     key=SECRET_KEY):
     '''Encrypt archives with PyNaCl.'''
     format_log('Encrypting volumes.')
     for volume in volumes.split(','):
@@ -76,9 +80,12 @@ def encrypt_archives(volumes=VOLUMES, backup_directory=BACKUP_DIRECTORY, thismon
 def list_local_encrypted_archives(volumes=VOLUMES):
     '''Function listing local encrypted archives.'''
     format_log('List local encrypted volumes.')
-    list_files_matching(f"\d+-({volumes.replace(',', '|')})\.tar\.gz\.enc")
+    list_files_matching(rf"\d+-({volumes.replace(',', '|')})\.tar\.gz\.enc")
 
-def decrypt_archives(volumes=VOLUMES, backup_directory=BACKUP_DIRECTORY, thismonth=THISMONTH, key=SECRET_KEY):
+def decrypt_archives(volumes=VOLUMES,
+                     backup_directory=BACKUP_DIRECTORY,
+                     thismonth=THISMONTH,
+                     key=SECRET_KEY):
     '''Decrypt archives with PyNaCl.'''
     format_log('Decrypting volumes.')
     for volume in volumes.split(','):
