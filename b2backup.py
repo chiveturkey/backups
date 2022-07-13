@@ -53,10 +53,10 @@ def list_files_matching(match_pattern, backup_directory=BACKUP_DIRECTORY):
             print(filename)
     print()
 
-def list_local_archives():
+def list_local_archives(volumes=VOLUMES):
     '''Function listing local tar'd and gzip'd archives.'''
     format_log('List local archived volumes.')
-    list_files_matching(r'.*\.tar\.gz')
+    list_files_matching(f"\d+-({volumes.replace(',', '|')})\.tar\.gz")
 
 def encrypt_archives(volumes=VOLUMES, backup_directory=BACKUP_DIRECTORY, thismonth=THISMONTH, key=SECRET_KEY):
     '''Encrypt archives with PyNaCl.'''
@@ -73,10 +73,10 @@ def encrypt_archives(volumes=VOLUMES, backup_directory=BACKUP_DIRECTORY, thismon
             with open(f'{backup_directory}/{thismonth}-{volume}.tar.gz.enc', 'wb') as encrypted_volume_file:
                 encrypted_volume_file.write(encrypted_volume_contents)
 
-def list_local_encrypted_archives():
+def list_local_encrypted_archives(volumes=VOLUMES):
     '''Function listing local encrypted archives.'''
     format_log('List local encrypted volumes.')
-    list_files_matching(r'.*\.tar\.gz\.enc')
+    list_files_matching(f"\d+-({volumes.replace(',', '|')})\.tar\.gz\.enc")
 
 def decrypt_archives(volumes=VOLUMES, backup_directory=BACKUP_DIRECTORY, thismonth=THISMONTH, key=SECRET_KEY):
     '''Decrypt archives with PyNaCl.'''
