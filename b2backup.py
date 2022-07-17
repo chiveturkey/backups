@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 '''Module providing backups to B2.'''
+import gc
 import os
 import re
 import tarfile
@@ -76,9 +77,19 @@ def encrypt_archives(volumes=VOLUMES,
                 if volume_contents_part != b'':
                     box = nacl.secret.SecretBox(key)
                     encrypted_volume_contents_part = box.encrypt(volume_contents_part)
+                    # HACKTAG: I suspect this is really awful.  :D  How else could we do it?
+                    # Experimenting with pseudo-manual memory management.  Reset
+                    # volume_contents_part variable, and force garbage collection.
+                    volume_contents_part = b' '
+                    gc.collect()
                     with open(f'{backup_directory}/{thismonth}-{volume}.tar.gz.enc.part{part_number:03d}',
                               'wb') as encrypted_volume_file_part:
                         encrypted_volume_file_part.write(encrypted_volume_contents_part)
+                    # HACKTAG: I suspect this is really awful.  :D  How else could we do it?
+                    # Experimenting with pseudo-manual memory management.  Delete
+                    # encrypted_volume_contents_part variable, and force garbage collection.
+                    del encrypted_volume_contents_part
+                    gc.collect()
                     part_number += 1
 
 def list_local_encrypted_archives(volumes=VOLUMES):
