@@ -111,8 +111,18 @@ def decrypt_archives(volumes=VOLUMES,
                 encrypted_volume_contents_part = encrypted_volume_file_part.read()
                 box = nacl.secret.SecretBox(key)
                 volume_contents_part = box.decrypt(encrypted_volume_contents_part)
+                # HACKTAG: I suspect this is really awful.  :D  How else could we do it?
+                # Experimenting with pseudo-manual memory management.  Delete
+                # encrypted_volume_contents_part variable, and force garbage collection.
+                del encrypted_volume_contents_part
+                gc.collect()
                 with open(f'{backup_directory}/{thismonth}-{volume}.tar.gz', 'ab') as volume_file:
                     volume_file.write(volume_contents_part)
+                # HACKTAG: I suspect this is really awful.  :D  How else could we do it?
+                # Experimenting with pseudo-manual memory management.  Delete
+                # volume_contents_part variable, and force garbage collection.
+                del volume_contents_part
+                gc.collect()
             part_number += 1
 
 
