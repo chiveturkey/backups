@@ -2,12 +2,14 @@
 
 '''Module providing backups to B2.'''
 import gc
+import mmap
 import os
 import re
 import sys
 import tarfile
 from datetime import date
 from datetime import datetime
+import requests
 import yaml
 import nacl.secret
 import nacl.utils
@@ -19,6 +21,7 @@ CONFIG_FILE_NAME = 'config.yaml'
 THISMONTH = '{:%Y%m}01'.format(date.today())
 BACKUP_DIRECTORY_DEFAULT = '.'
 ENCRYPTED_FILE_PART_SIZE_DEFAULT = 1024
+B2_AUTHORIZATION_URL = 'https://api.backblazeb2.com/b2api/v2/b2_authorize_account'
 DEBUG = False
 
 
@@ -81,6 +84,19 @@ def check_and_update_volumes(config):
 
     return config
 
+def check_and_update_b2(config):
+    '''Function checking b2 authentication and authorization values in config.'''
+    if 'b2_key_id' not in config:
+        config['b2_key_id'] = ''
+
+    if 'b2_key_value' not in config:
+        config['b2_key_value'] = ''
+
+    if 'b2_bucket_id' not in config:
+        config['b2_bucket_id'] = ''
+
+    return config
+
 def check_and_update_config(config,
                             backup_directory_default=BACKUP_DIRECTORY_DEFAULT,
                             encrypted_file_part_size_default=ENCRYPTED_FILE_PART_SIZE_DEFAULT):
@@ -99,6 +115,8 @@ def check_and_update_config(config,
         # Default 'encrypted_file_part_size' to 1M.
         if 'encrypted_file_part_size' not in config:
             config['encrypted_file_part_size'] = encrypted_file_part_size_default
+
+        config = check_and_update_b2(config)
 
     return config
 
@@ -135,18 +153,13 @@ def encrypt_archives(config, thismonth=THISMONTH):
     format_log('Encrypting volumes.')
     for volume in config['volumes']:
         with open(f"{config['backup_directory']}/{thismonth}-{volume}.tar.gz", 'rb') as volume_file:
-            volume_contents_part = b' '
-            part_number = 1
-            while volume_contents_part != b'':
-                volume_contents_part = volume_file.read(config['encrypted_file_part_size'])
-                if volume_contents_part != b'':
+            with mmap.mmap(volume_file.fileno(), 0, access=mmap.ACCESS_READ) as mm:
+                last_byte = mm.size() - 1
+                volume_contents_part = b' '
+                part_number = 1
+                while mm.tell() <= last_byte:
                     box = nacl.secret.SecretBox(config['secret_key'])
-                    encrypted_volume_contents_part = box.encrypt(volume_contents_part)
-                    # HACKTAG: I suspect this is really awful.  :D  How else could we do it?
-                    # Experimenting with pseudo-manual memory management.  Reset
-                    # volume_contents_part variable, and force garbage collection.
-                    volume_contents_part = b' '
-                    gc.collect()
+                    encrypted_volume_contents_part = box.encrypt(mm.read(config['encrypted_file_part_size']))
                     with open(f"{config['backup_directory']}/{thismonth}-{volume}.tar.gz.enc.part{part_number:03d}",
                               'wb') as encrypted_volume_file_part:
                         encrypted_volume_file_part.write(encrypted_volume_contents_part)
@@ -187,6 +200,30 @@ def decrypt_archives(config, thismonth=THISMONTH):
                 gc.collect()
             part_number += 1
 
+def checksum(config, thismonth=THISMONTH):
+    '''Function computing a checksum on a string.'''
+
+def b2_authorize_account(config, b2_authorization_url=B2_AUTHORIZATION_URL):
+    '''Function authorizing B2 account.'''
+    response = requests.get(b2_authorization_url, auth=(config['b2_key_id'], config['b2_key_value']))
+    print(response.text)
+    if response.status_code == 200:
+        format_log('Authorized account with B2.')
+        config['api_url'] = response.json()['apiUrl']
+        config['auth_token'] = response.json()['authorizationToken']
+        return config
+    else:
+        format_log('Failed to authorize account with B2.')
+        format_log(f'HTTP Status Code: {response.status_code}')
+        sys.exit(1)
+
+def b2_list_files(config):
+    '''Function listing files in a B2 bucket.'''
+    response = requests.post(f"{config['api_url']}/b2api/v2/b2_list_file_names",
+                             headers={'Authorization': config['auth_token']},
+                             data='{"bucketId": "%s"}' % config['b2_bucket_id'])
+    print(response.text)
+
 
 # Main
 
@@ -202,8 +239,10 @@ def main():
     list_local_encrypted_archives(config)
 
 main()
-# encrypt_archives()
-# decrypt_archives()
 # configuration = read_config()
 # configuration = check_and_update_config(configuration)
 # print(configuration)
+# encrypt_archives()
+# decrypt_archives(configuration)
+# configuration = b2_authorize_account(configuration)
+# b2_list_files(configuration)
