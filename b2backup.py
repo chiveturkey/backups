@@ -280,7 +280,7 @@ def b2_upload_file(volume, file_info, upload_url, upload_auth_token, debug=DEBUG
 
 def get_file_info(file_part_name, backup_directory):
     """Function gathering file info."""
-    file_size = str(os.stat(file_part_name).st_size)
+    file_size = str(os.stat(f"{backup_directory}/{file_part_name}").st_size)
     file_hash = b''
     file_contents = b''
     with open(f"{backup_directory}/{file_part_name}.sha1", 'rb') as file_part_hash:
