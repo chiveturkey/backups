@@ -260,13 +260,20 @@ def b2_get_upload_url(api_url, auth_token, b2_bucket_id, debug=DEBUG):
 
 def b2_upload_file(volume, file_info, upload_url, upload_auth_token, debug=DEBUG):
     """Function interacting with B2 API to upload file to a B2 bucket."""
-    response = requests.post(upload_url,
-                             headers={'Authorization': upload_auth_token,
-                                      'X-Bz-File-Name': f"{volume}/{file_info['file_name']}",
-                                      'Content-Type': 'application/octet-stream',
-                                      'Content-Length': file_info['file_size'],
-                                      'X-Bz-Content-Sha1': file_info['file_hash']},
-                             data=file_info['file_contents'])
+    try:
+        response = requests.post(upload_url,
+                                 headers={'Authorization': upload_auth_token,
+                                          'X-Bz-File-Name': f"{volume}/{file_info['file_name']}",
+                                          'Content-Type': 'application/octet-stream',
+                                          'Content-Length': file_info['file_size'],
+                                          'X-Bz-Content-Sha1': file_info['file_hash']},
+                                 data=file_info['file_contents'])
+    except requests.exceptions.ConnectionError as err:
+        format_log(f"A ConnectionError occurred for {file_info['file_name']}: {err}")
+    except:
+        format_log('An unknown error occurred.')
+        format_log(sys.exc_info())
+
     if debug:
         format_log(response.text)
 
