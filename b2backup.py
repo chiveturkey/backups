@@ -303,14 +303,14 @@ def get_file_info(file_part_name, backup_directory):
 def upload_archive_file_part(volume, file_part_name, config):
     """Function gathering file info and uploading file to B2 bucket."""
     file_info = get_file_info(file_part_name, config['backup_directory'])
-    for dummy in range(5):
+    for i in range(5):
         upload_url, upload_auth_token = b2_get_upload_url(config['api_url'],
                                                           config['auth_token'],
                                                           config['b2_bucket_id'])
         if b2_upload_file(volume, file_info, upload_url, upload_auth_token):
             return True
 
-        time.sleep(2)
+        time.sleep(5 * i)
 
     format_log(f'Failed to upload {file_part_name} to B2 after 5 tries.')
     return False
@@ -321,6 +321,7 @@ def upload_archive_files(config, thismonth=THISMONTH):
     for volume in config['volumes']:
         for file_part_name in list_files_matching(rf"{thismonth}-{volume}\.tar\.gz\.enc.part\d+$",
                                                   config['backup_directory']):
+            # TODO: Key off of return value of upload_archive_file_part.
             upload_archive_file_part(volume, file_part_name, config)
 
 
