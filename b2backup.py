@@ -268,21 +268,21 @@ def b2_upload_file(volume, file_info, upload_url, upload_auth_token, debug=DEBUG
                                           'Content-Length': file_info['file_size'],
                                           'X-Bz-Content-Sha1': file_info['file_hash']},
                                  data=file_info['file_contents'])
+        if debug:
+            format_log(response.text)
+
+        if response.status_code == 200:
+            format_log(f"Uploaded {file_info['file_name']} to B2.")
+            return True
+
+        format_log(f"Failed to upload {file_info['file_name']} to B2.")
+        format_log(f'HTTP Status Code: {response.status_code}')
     except requests.exceptions.ConnectionError as err:
         format_log(f"A ConnectionError occurred for {file_info['file_name']}: {err}")
     except:
         format_log('An unknown error occurred.')
         format_log(sys.exc_info())
 
-    if debug:
-        format_log(response.text)
-
-    if response.status_code == 200:
-        format_log(f"Uploaded {file_info['file_name']} to B2.")
-        return True
-
-    format_log(f"Failed to upload {file_info['file_name']} to B2.")
-    format_log(f'HTTP Status Code: {response.status_code}')
     return False
 
 def get_file_info(file_part_name, backup_directory):
