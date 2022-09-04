@@ -24,6 +24,8 @@ THISMONTH = '{:%Y%m}01'.format(date.today())
 BACKUP_DIRECTORY_DEFAULT = '.'
 ENCRYPTED_FILE_PART_SIZE_DEFAULT = 1024
 B2_AUTHORIZATION_URL = 'https://api.backblazeb2.com/b2api/v2/b2_authorize_account'
+UPLOAD_ATTEMPTS = 6
+BACKOFF_MODIFIER = 225
 DEBUG = False
 
 
@@ -300,17 +302,24 @@ def get_file_info(file_part_name, backup_directory):
             'file_hash': file_hash,
             'file_contents': file_contents}
 
-def upload_archive_file_part(volume, file_part_name, config):
+def upload_archive_file_part(volume,
+                             file_part_name,
+                             config,
+                             upload_attempts=UPLOAD_ATTEMPTS,
+                             backoff_modifier=BACKOFF_MODIFIER):
     """Function gathering file info and uploading file to B2 bucket."""
     file_info = get_file_info(file_part_name, config['backup_directory'])
-    for i in range(5):
+    for i in range(upload_attempts):
         upload_url, upload_auth_token = b2_get_upload_url(config['api_url'],
                                                           config['auth_token'],
                                                           config['b2_bucket_id'])
         if b2_upload_file(volume, file_info, upload_url, upload_auth_token):
             return True
 
-        time.sleep(5 * i)
+        # Exponential backoff.  Sleep after each attempt except for the last.
+        if i < upload_attempts - 1:
+            format_log(f'Backing off for {backoff_modifier * i**2} seconds.')
+            time.sleep(backoff_modifier * i**2)
 
     format_log(f'Failed to upload {file_part_name} to B2 after 5 tries.')
     return False
