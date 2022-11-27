@@ -11,6 +11,7 @@ import tarfile
 import time
 from datetime import date
 from datetime import datetime
+from datetime import timedelta
 import requests
 import yaml
 import nacl.secret
@@ -26,6 +27,9 @@ ENCRYPTED_FILE_PART_SIZE_DEFAULT = 1024
 B2_AUTHORIZATION_URL = 'https://api.backblazeb2.com/b2api/v2/b2_authorize_account'
 UPLOAD_ATTEMPTS = 6
 BACKOFF_MODIFIER = 225
+ACTIVE_PERIOD_BEGIN_HOUR = 20
+ACTIVE_PERIOD_END_HOUR = 8
+ESTIMATED_UPLOAD_TIME = 30
 DEBUG = False
 
 
@@ -302,6 +306,28 @@ def get_file_info(file_part_name, backup_directory):
             'file_hash': file_hash,
             'file_contents': file_contents}
 
+def active_upload_period(check_time,
+                         active_period_begin_hour=ACTIVE_PERIOD_BEGIN_HOUR,
+                         active_period_end_hour=ACTIVE_PERIOD_END_HOUR):
+    """Function determining whether upload execution is within active upload period."""
+    if check_time.hour >= active_period_begin_hour:
+        active_period_begin = datetime(check_time.year, check_time.month, check_time.day, active_period_begin_hour)
+    else:
+        active_period_begin = datetime(check_time.year, check_time.month, check_time.day - 1, active_period_begin_hour)
+
+    active_period_end = datetime(check_time.year, check_time.month, active_period_begin.day + 1, active_period_end_hour)
+
+    return bool(active_period_begin <= check_time < active_period_end)
+
+def pause_if_out_of_upload_period(active_period_begin_hour=ACTIVE_PERIOD_BEGIN_HOUR,
+                                  estimated_upload_time=ESTIMATED_UPLOAD_TIME):
+    """Function pausing upload execution if outside of active upload period."""
+    now = datetime.now()
+    if not active_upload_period(now + timedelta(minutes=estimated_upload_time)):
+        format_log(f'Outside of active upload period.  Sleeping until {active_period_begin_hour}:00.')
+        time.sleep((datetime(now.year, now.month, now.day, active_period_begin_hour) - now).seconds)
+        format_log('Inside active period.  Continuing upload.')
+
 def upload_archive_file_part(volume,
                              file_part_name,
                              config,
@@ -310,6 +336,7 @@ def upload_archive_file_part(volume,
     """Function gathering file info and uploading file to B2 bucket."""
     file_info = get_file_info(file_part_name, config['backup_directory'])
     for i in range(upload_attempts):
+        pause_if_out_of_upload_period()
         upload_url, upload_auth_token = b2_get_upload_url(config['api_url'],
                                                           config['auth_token'],
                                                           config['b2_bucket_id'])
