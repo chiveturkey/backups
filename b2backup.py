@@ -321,7 +321,7 @@ def upload_archive_file_part(volume,
             format_log(f'Backing off for {backoff_modifier * i**2} seconds.')
             time.sleep(backoff_modifier * i**2)
 
-    format_log(f'Failed to upload {file_part_name} to B2 after 5 tries.')
+    format_log(f'Failed to upload {file_part_name} to B2 after {upload_attempts} tries.')
     return False
 
 def upload_archive_files(config, thismonth=THISMONTH):
