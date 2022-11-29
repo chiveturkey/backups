@@ -138,6 +138,7 @@ def create_archives(config, thismonth=THISMONTH):
     os.chdir(config['backup_directory'])
 
     for volume in config['volumes']:
+        format_log(f'Archiving volume: {volume}')
         with tarfile.open(f"{config['backup_directory']}/{thismonth}-{volume}.tar.gz",'w:gz') as tar:
             tar.add(volume)
 
