@@ -249,21 +249,28 @@ def b2_list_files(config):
 
 def b2_get_upload_url(api_url, auth_token, b2_bucket_id, debug=DEBUG):
     """Function getting upload URL for a B2 bucket."""
-    response = requests.post(f"{api_url}/b2api/v2/b2_get_upload_url",
-                             headers={'Authorization': auth_token},
-                             data='{"bucketId": "%s"}' % b2_bucket_id)
-    if debug:
-        format_log(response.text)
+    try:
+        response = requests.post(f"{api_url}/b2api/v2/b2_get_upload_url",
+                                 headers={'Authorization': auth_token},
+                                 data='{"bucketId": "%s"}' % b2_bucket_id)
+        if debug:
+            format_log(response.text)
 
-    if response.status_code == 200:
-        format_log('Got upload URL from B2.')
-        upload_url = response.json()['uploadUrl']
-        upload_auth_token = response.json()['authorizationToken']
-        return upload_url, upload_auth_token
+        if response.status_code == 200:
+            format_log('Got upload URL from B2.')
+            upload_url = response.json()['uploadUrl']
+            upload_auth_token = response.json()['authorizationToken']
+            return upload_url, upload_auth_token
+
+        format_log(f'HTTP Status Code: {response.status_code}')
+    except requests.exceptions.ConnectionError as err:
+        format_log(f"A ConnectionError occurred for {api_url}: {err}")
+    except:
+        format_log('An unknown error occurred.')
+        format_log(sys.exc_info())
 
     format_log('Failed to get upload URL from B2.')
-    format_log(f'HTTP Status Code: {response.status_code}')
-    sys.exit(1)
+    return None, None
 
 def b2_upload_file(volume, file_info, upload_url, upload_auth_token, debug=DEBUG):
     """Function interacting with B2 API to upload file to a B2 bucket."""
@@ -282,7 +289,6 @@ def b2_upload_file(volume, file_info, upload_url, upload_auth_token, debug=DEBUG
             format_log(f"Uploaded {file_info['file_name']} to B2.")
             return True
 
-        format_log(f"Failed to upload {file_info['file_name']} to B2.")
         format_log(f'HTTP Status Code: {response.status_code}')
     except requests.exceptions.ConnectionError as err:
         format_log(f"A ConnectionError occurred for {file_info['file_name']}: {err}")
@@ -290,6 +296,7 @@ def b2_upload_file(volume, file_info, upload_url, upload_auth_token, debug=DEBUG
         format_log('An unknown error occurred.')
         format_log(sys.exc_info())
 
+    format_log(f"Failed to upload {file_info['file_name']} to B2.")
     return False
 
 def get_file_info(file_part_name, backup_directory):
@@ -341,8 +348,9 @@ def upload_archive_file_part(volume,
         upload_url, upload_auth_token = b2_get_upload_url(config['api_url'],
                                                           config['auth_token'],
                                                           config['b2_bucket_id'])
-        if b2_upload_file(volume, file_info, upload_url, upload_auth_token):
-            return True
+        if upload_url is not None and upload_auth_token is not None:
+            if b2_upload_file(volume, file_info, upload_url, upload_auth_token):
+                return True
 
         # Exponential backoff.  Sleep after each attempt except for the last.
         if i < upload_attempts - 1:
