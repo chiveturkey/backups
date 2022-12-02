@@ -335,6 +335,9 @@ def pause_if_out_of_upload_period(active_period_begin_hour=ACTIVE_PERIOD_BEGIN_H
         format_log(f'Outside of active upload period.  Sleeping until {active_period_begin_hour}:00.')
         time.sleep((datetime(now.year, now.month, now.day, active_period_begin_hour) - now).seconds)
         format_log('Inside active period.  Continuing upload.')
+        return True
+
+    return False
 
 def upload_archive_file_part(volume,
                              file_part_name,
@@ -344,7 +347,6 @@ def upload_archive_file_part(volume,
     """Function gathering file info and uploading file to B2 bucket."""
     file_info = get_file_info(file_part_name, config['backup_directory'])
     for i in range(upload_attempts):
-        pause_if_out_of_upload_period()
         upload_url, upload_auth_token = b2_get_upload_url(config['api_url'],
                                                           config['auth_token'],
                                                           config['b2_bucket_id'])
@@ -362,10 +364,15 @@ def upload_archive_file_part(volume,
 
 def upload_archive_files(config, thismonth=THISMONTH):
     """Function uploading archive files."""
+    config = b2_authorize_account(config)
     format_log('Uploading volumes.')
     for volume in config['volumes']:
+        format_log(f'Uploading volume: {volume}')
         for file_part_name in list_files_matching(rf"{thismonth}-{volume}\.tar\.gz\.enc.part\d+$",
                                                   config['backup_directory']):
+            if pause_if_out_of_upload_period():
+                # Refresh auth_token after pause.
+                config = b2_authorize_account(config)
             # TODO: Key off of return value of upload_archive_file_part.
             upload_archive_file_part(volume, file_part_name, config)
 
@@ -383,7 +390,6 @@ def main():
     encrypt_archives(config)
     list_local_encrypted_archives(config)
 
-    config = b2_authorize_account(config)
     upload_archive_files(config)
 
 main()
