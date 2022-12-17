@@ -402,9 +402,17 @@ def verify_uploaded_files(config, thismonth=THISMONTH):
     """Function verifying that all files uploaded successfully."""
     format_log('Verifying uploaded volumes.')
     for volume in config['volumes']:
+        files = b2_list_files(config, f'{volume}/{thismonth}')
+        if files == []:
+            format_log(f'{volume} not found on B2.')
+            return False
         for file_part_name in list_files_matching(rf"{thismonth}-{volume}\.tar\.gz\.enc.part\d+$",
                                                   config['backup_directory']):
-            if b2_list_files(config, f'{volume}/{file_part_name}') == []:
+            file_found = False
+            for file_info in files:
+                if file_info[0] == f'{volume}/{file_part_name}':
+                    file_found = True
+            if not file_found:
                 format_log(f'{file_part_name} not found on B2.')
                 return False
     return True
@@ -512,4 +520,6 @@ main()
 # decrypt_archives(configuration)
 # configuration = b2_authorize_account(configuration)
 # upload_archive_files(configuration)
+# verify_uploaded_files(configuration)
+# format_log('Finished.')
 # verify_and_cleanup(configuration)
