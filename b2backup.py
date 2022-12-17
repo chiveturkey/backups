@@ -430,7 +430,7 @@ def delete_current_local_archive_file_parts(config, thismonth=THISMONTH):
     """Function deleting current local encrypted archive file parts."""
     format_log('Delete old local encrypted archive file parts.')
     for filename in list_local_archive_file_parts_from_date(config, thismonth):
-        os.remove(f'{config['backup_directory']}/{filename}')
+        os.remove(f"{config['backup_directory']}/{filename}")
 
 def list_local_archives_from_date(config, archive_file_date):
     """Function listing local tar'd and gzip'd archives from a particular date."""
@@ -445,7 +445,7 @@ def delete_old_local_archive_files(config, old_file_date=THREE_MONTHS_AGO):
     """Function deleting old local archive files."""
     format_log('Delete old local archived volume files.')
     for filename in list_local_archives_from_date(config, old_file_date):
-        os.remove(f'{config['backup_directory']}/{filename}')
+        os.remove(f"{config['backup_directory']}/{filename}")
 
 def b2_delete_file(filename, file_id, api_url, auth_token, debug=DEBUG):
     """Function deleting a file from b2."""
