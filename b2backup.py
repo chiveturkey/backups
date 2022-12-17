@@ -508,11 +508,8 @@ def main():
     list_local_archives(config)
     encrypt_archives(config)
     list_local_encrypted_archives(config)
-
     upload_archive_files(config)
-
-    # TODO: Uncomment when ready.
-    # verify_and_cleanup(config)
+    verify_and_cleanup(config)
 
 main()
 # configuration = read_config()
