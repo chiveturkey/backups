@@ -22,6 +22,7 @@ import nacl.utils
 
 CONFIG_FILE_NAME = 'config.yaml'
 THISMONTH = '{:%Y%m}01'.format(date.today())
+THREE_MONTHS_AGO = '{:%Y%m}01'.format(date.today() - timedelta(weeks=12))
 BACKUP_DIRECTORY_DEFAULT = '.'
 ENCRYPTED_FILE_PART_SIZE_DEFAULT = 1024
 B2_AUTHORIZATION_URL = 'https://api.backblazeb2.com/b2api/v2/b2_authorize_account'
@@ -30,6 +31,7 @@ BACKOFF_MODIFIER = 225
 ACTIVE_PERIOD_BEGIN_HOUR = 20
 ACTIVE_PERIOD_END_HOUR = 8
 ESTIMATED_UPLOAD_TIME = 30
+DISABLE_PAUSE = False
 DEBUG = False
 
 
@@ -240,12 +242,32 @@ def b2_authorize_account(config, b2_authorization_url=B2_AUTHORIZATION_URL, debu
     # TODO: Should we have this exit, or would it be better to bubble up the error and retry?
     sys.exit(1)
 
-def b2_list_files(config):
+def b2_list_files(config, prefix='', max_file_count=1000, debug=DEBUG):
     """Function listing files in a B2 bucket."""
-    response = requests.post(f"{config['api_url']}/b2api/v2/b2_list_file_names",
-                             headers={'Authorization': config['auth_token']},
-                             data='{"bucketId": "%s"}' % config['b2_bucket_id'])
-    print(response.text)
+    try:
+        response = requests.post(f"{config['api_url']}/b2api/v2/b2_list_file_names",
+                                 headers={'Authorization': config['auth_token']},
+                                 data=f"{{\"bucketId\": \"{config['b2_bucket_id']}\", \
+                                          \"maxFileCount\": {max_file_count}, \
+                                          \"prefix\": \"{prefix}\"}}")
+        if debug:
+            format_log(response.text)
+
+        if response.status_code == 200:
+            files = []
+            for file_json in response.json()['files']:
+                files.append((file_json['fileName'], file_json['fileId']))
+            return files
+
+        format_log(f'HTTP Status Code: {response.status_code}')
+    except requests.exceptions.ConnectionError as err:
+        format_log(f"A ConnectionError occurred for b2_list_file_names: {err}")
+    except:
+        format_log('An unknown error occurred.')
+        format_log(sys.exc_info())
+
+    format_log('Failed to list files on B2.')
+    return []
 
 def b2_get_upload_url(api_url, auth_token, b2_bucket_id, debug=DEBUG):
     """Function getting upload URL for a B2 bucket."""
@@ -362,7 +384,7 @@ def upload_archive_file_part(volume,
     format_log(f'Failed to upload {file_part_name} to B2 after {upload_attempts} tries.')
     return False
 
-def upload_archive_files(config, thismonth=THISMONTH):
+def upload_archive_files(config, thismonth=THISMONTH, disable_pause=DISABLE_PAUSE):
     """Function uploading archive files."""
     config = b2_authorize_account(config)
     format_log('Uploading volumes.')
@@ -370,11 +392,100 @@ def upload_archive_files(config, thismonth=THISMONTH):
         format_log(f'Uploading volume: {volume}')
         for file_part_name in list_files_matching(rf"{thismonth}-{volume}\.tar\.gz\.enc.part\d+$",
                                                   config['backup_directory']):
-            if pause_if_out_of_upload_period():
+            if not disable_pause and pause_if_out_of_upload_period():
                 # Refresh auth_token after pause.
                 config = b2_authorize_account(config)
             # TODO: Key off of return value of upload_archive_file_part.
             upload_archive_file_part(volume, file_part_name, config)
+
+def verify_uploaded_files(config, thismonth=THISMONTH):
+    """Function verifying that all files uploaded successfully."""
+    format_log('Verifying uploaded volumes.')
+    for volume in config['volumes']:
+        for file_part_name in list_files_matching(rf"{thismonth}-{volume}\.tar\.gz\.enc.part\d+$",
+                                                  config['backup_directory']):
+            if b2_list_files(config, f'{volume}/{file_part_name}') == []:
+                format_log(f'{file_part_name} not found on B2.')
+                return False
+    return True
+
+def list_local_archive_file_parts_from_date(config, archive_file_part_date):
+    """Function listing local encrypted archive file parts from a particular date."""
+    format_log(f'List local encrypted archive file parts from {archive_file_part_date}.')
+    file_list = list_files_matching(rf"{archive_file_part_date}-({'|'.join(config['volumes'])})\.tar\.gz\.enc.part",
+                                    config['backup_directory'])
+    for filename in file_list:
+        format_log(filename)
+    return file_list
+
+def delete_current_local_archive_file_parts(config, thismonth=THISMONTH):
+    """Function deleting current local encrypted archive file parts."""
+    format_log('Delete old local encrypted archive file parts.')
+    for filename in list_local_archive_file_parts_from_date(config, thismonth):
+        os.remove(filename)
+
+def list_local_archives_from_date(config, archive_file_date):
+    """Function listing local tar'd and gzip'd archives from a particular date."""
+    format_log(f'List local archived volumes from {archive_file_date}.')
+    file_list = list_files_matching(rf"{archive_file_date}-({'|'.join(config['volumes'])})\.tar\.gz",
+                                    config['backup_directory'])
+    for filename in file_list:
+        format_log(filename)
+    return file_list
+
+def delete_old_local_archive_files(config, old_file_date=THREE_MONTHS_AGO):
+    """Function deleting old local archive files."""
+    format_log('Delete old local archived volume files.')
+    for filename in list_local_archives_from_date(config, old_file_date):
+        os.remove(filename)
+
+def b2_delete_file(filename, file_id, api_url, auth_token, debug=DEBUG):
+    """Function deleting a file from b2."""
+    try:
+        response = requests.post(f"{api_url}/b2api/v2/b2_delete_file_version",
+                                 headers={'Authorization': auth_token},
+                                 data=f'{{"fileName": "{filename}", "fileId": "{file_id}"}}')
+        if debug:
+            format_log(response.text)
+
+        if response.status_code == 200:
+            format_log(f"Deleted {filename} from B2.")
+            return True
+
+        format_log(f'HTTP Status Code: {response.status_code}')
+    except requests.exceptions.ConnectionError as err:
+        format_log(f"A ConnectionError occurred for {filename}: {err}")
+    except:
+        format_log('An unknown error occurred.')
+        format_log(sys.exc_info())
+
+    format_log(f"Failed to delete {filename} from B2.")
+    return False
+
+def b2_delete_old_files(config, old_file_date=THREE_MONTHS_AGO):
+    """Function deleting old files from B2."""
+    format_log('Deleting old volumes from B2.')
+    for volume in config['volumes']:
+        format_log(f'Deleting volume: {volume}/{old_file_date}')
+        files = b2_list_files(config, f'{volume}/{old_file_date}')
+        if files == []:
+            format_log(f'Unable to delete.  There are no old volumes matching: {volume}/{old_file_date}')
+        else:
+            for file_info in files:
+                # TODO: Key off of return value of b2_delete_file.
+                b2_delete_file(file_info[0], file_info[1], config['api_url'], config['auth_token'])
+
+def verify_and_cleanup(config):
+    """Function verifying uploads and deleting old files."""
+    config = b2_authorize_account(config)
+
+    if verify_uploaded_files(config):
+        delete_current_local_archive_file_parts(config)
+    else:
+        format_log('Failed to verify all uploaded files.  Not deleting local archive file parts.')
+
+    b2_delete_old_files(config)
+    delete_old_local_archive_files(config)
 
 
 # Main
@@ -392,16 +503,13 @@ def main():
 
     upload_archive_files(config)
 
+    # TODO: Uncomment when ready.
+    # verify_and_cleanup(config)
+
 main()
 # configuration = read_config()
 # configuration = check_and_update_config(configuration)
-# print(configuration)
-# list_local_archives(configuration)
-# list_local_encrypted_archives(configuration)
-# encrypt_archives()
 # decrypt_archives(configuration)
 # configuration = b2_authorize_account(configuration)
-# b2_list_files(configuration)
-# configuration = b2_get_upload_url(configuration)
-# print(configuration['upload_url'])
 # upload_archive_files(configuration)
+# verify_and_cleanup(configuration)
