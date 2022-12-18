@@ -512,11 +512,3 @@ def main():
     verify_and_cleanup(config)
 
 main()
-# configuration = read_config()
-# configuration = check_and_update_config(configuration)
-# decrypt_archives(configuration)
-# configuration = b2_authorize_account(configuration)
-# upload_archive_files(configuration)
-# verify_uploaded_files(configuration)
-# format_log('Finished.')
-# verify_and_cleanup(configuration)
