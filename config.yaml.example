@@ -1,0 +1,11 @@
+---
+volumes:
+  - photos
+  - videos
+  - files
+secret_key: abcdefghijklmnopqrstuvwxyz012345
+backup_directory: /backups
+encrypted_file_part_size: 1024
+b2_key_id: abcdefghijklmnopqrstuvwxy
+b2_key_value: abcdefghijklmnopqrstuvwxyz01234
+b2_bucket_id: abcdefghijklmnopqrstuvwx
