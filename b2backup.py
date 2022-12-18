@@ -511,4 +511,6 @@ def main():
     upload_archive_files(config)
     verify_and_cleanup(config)
 
+    banner('Monthly archival backup complete.')
+
 main()
